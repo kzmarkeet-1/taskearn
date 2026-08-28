@@ -1,0 +1,914 @@
+// TaskEarn — PostgreSQL schema.
+//
+// Money is stored as INTEGER MINOR UNITS (paisa). 100 = PKR 1.00.
+// Never use floats for money. All balance changes go through the wallet
+// service in src/lib/wallet.ts, which writes a WalletTransaction row for
+// every movement inside a database transaction.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ----------------------------------------------------------------------
+// Enums
+// ----------------------------------------------------------------------
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  UNDER_REVIEW
+  BANNED
+}
+
+enum CampaignStatus {
+  DRAFT
+  PENDING_REVIEW
+  ACTIVE
+  PAUSED
+  COMPLETED
+  EXPIRED
+  REJECTED
+}
+
+enum TaskStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  EXPIRED
+  REJECTED
+}
+
+enum TaskSessionStatus {
+  STARTED
+  SUBMITTED
+  COMPLETED
+  REJECTED
+  ABANDONED
+}
+
+enum SurveyCompletionStatus {
+  STARTED
+  COMPLETED
+  DISQUALIFIED
+  SCREENED_OUT
+  REVERSED
+}
+
+enum TransactionType {
+  VIDEO_REWARD
+  SURVEY_REWARD
+  REFERRAL_REWARD
+  BONUS
+  WITHDRAWAL
+  WITHDRAWAL_FEE
+  REVERSAL
+  ADMIN_ADJUSTMENT
+  TIER_PURCHASE
+}
+
+enum BalanceBucket {
+  AVAILABLE
+  PENDING
+  BONUS
+  REFERRAL
+}
+
+enum WithdrawalStatus {
+  PENDING
+  UNDER_REVIEW
+  APPROVED
+  PROCESSING
+  COMPLETED
+  REJECTED
+  CANCELLED
+}
+
+enum PayoutMethod {
+  JAZZCASH
+  EASYPAISA
+  BANK_TRANSFER
+  CRYPTO_USDT
+  STRIPE
+}
+
+/**
+ * Membership tiers.
+ *
+ * A tier is a paid subscription to a higher daily task allowance — a fee for a
+ * service, with a fixed term and no promised return. It is deliberately NOT an
+ * investment, a node, a stake or a package that pays a yield: see TierPlan for
+ * the constraints that keep it that way.
+ */
+enum UserTier {
+  FREE
+  SILVER
+  GOLD
+  DIAMOND
+}
+
+enum SubscriptionStatus {
+  PENDING_PAYMENT
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+enum DepositMethod {
+  CRYPTO_USDT
+  STRIPE
+}
+
+enum DepositStatus {
+  AWAITING_PAYMENT
+  CONFIRMING
+  CONFIRMED
+  FAILED
+  EXPIRED
+  REFUNDED
+}
+
+/** Chains the USDT gateway may be configured for. */
+enum CryptoNetwork {
+  TRC20
+  ERC20
+  BEP20
+  POLYGON
+}
+
+enum NotificationType {
+  TASK_AVAILABLE
+  REWARD_CREDITED
+  WITHDRAWAL_SUBMITTED
+  WITHDRAWAL_APPROVED
+  WITHDRAWAL_COMPLETED
+  WITHDRAWAL_REJECTED
+  SECURITY_ALERT
+  SYSTEM_ANNOUNCEMENT
+  DEPOSIT_CONFIRMED
+  TIER_ACTIVATED
+  TIER_EXPIRING
+  TIER_EXPIRED
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING_FOR_USER
+  RESOLVED
+  CLOSED
+}
+
+enum TicketPriority {
+  LOW
+  NORMAL
+  HIGH
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum FraudEventType {
+  REPEATED_ACCOUNT_CREATION
+  DUPLICATE_SURVEY_COMPLETION
+  ABNORMAL_TASK_SPEED
+  EXCESSIVE_REFERRAL_ACTIVITY
+  SUSPICIOUS_WITHDRAWAL
+  UNUSUAL_ACCOUNT_ACTIVITY
+  SESSION_INTEGRITY_FAILURE
+}
+
+enum ReferralStatus {
+  PENDING
+  QUALIFIED
+  REWARDED
+  REJECTED
+}
+
+enum SettingType {
+  INT
+  STRING
+  BOOLEAN
+}
+
+// ----------------------------------------------------------------------
+// Identity
+// ----------------------------------------------------------------------
+
+model User {
+  id                String     @id @default(uuid()) @db.Uuid
+  fullName          String
+  email             String     @unique
+  phone             String
+  passwordHash      String
+  country           String
+  role              Role       @default(USER)
+  status            UserStatus @default(ACTIVE)
+  emailVerifiedAt   DateTime?
+  referralCode      String     @unique
+  referredByCode    String?
+  // Current membership. Denormalised from the live TierSubscription so the
+  // hot path (daily limit checks) is a single read. `expireSubscriptions`
+  // is the only thing that moves it back to FREE.
+  tier              UserTier   @default(FREE)
+  tierExpiresAt     DateTime?
+  lastLoginAt       DateTime?
+  lastLoginIpHash   String?
+  isDemo            Boolean    @default(false)
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  profile           UserProfile?
+  wallet            Wallet?
+  sessions          AuthSession[]
+  verificationTokens VerificationToken[]
+  taskSessions      TaskSession[]
+  taskCompletions   TaskCompletion[]
+  surveyCompletions SurveyCompletion[]
+  transactions      WalletTransaction[]
+  withdrawals       Withdrawal[]
+  payoutMethods     PayoutAccount[]
+  referralsMade     Referral[]  @relation("Referrer")
+  referralReceived  Referral?   @relation("Referee")
+  notifications     Notification[]
+  tickets           SupportTicket[]
+  ticketMessages    SupportMessage[]
+  fraudEvents       FraudEvent[]
+  riskScore         RiskScore?
+  auditLogs         AuditLog[]  @relation("ActorLogs")
+  subscriptions     TierSubscription[]
+  deposits          Deposit[]
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([referredByCode])
+  @@index([tier, tierExpiresAt])
+  @@map("users")
+}
+
+model UserProfile {
+  id            String   @id @default(uuid()) @db.Uuid
+  userId        String   @unique @db.Uuid
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dateOfBirth   DateTime?
+  gender        String?
+  city          String?
+  timezone      String?
+  avatarUrl     String?
+  marketingOptIn Boolean @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("user_profiles")
+}
+
+model AuthSession {
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String   @db.Uuid
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash    String   @unique
+  userAgent    String?
+  ipHash       String?
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("auth_sessions")
+}
+
+model VerificationToken {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @db.Uuid
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash  String   @unique
+  purpose    String // EMAIL_VERIFICATION | PASSWORD_RESET
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime @default(now())
+
+  @@index([userId, purpose])
+  @@map("verification_tokens")
+}
+
+// ----------------------------------------------------------------------
+// Sponsored video campaigns
+// ----------------------------------------------------------------------
+
+model Campaign {
+  id                  String         @id @default(uuid()) @db.Uuid
+  name                String
+  advertiser          String
+  description         String
+  videoUrl            String
+  thumbnailUrl        String?
+  rewardAmount        Int // minor units
+  requiredWatchSeconds Int
+  totalBudget         Int // minor units
+  spentBudget         Int            @default(0)
+  dailyQuota          Int
+  totalQuota          Int
+  completedCount      Int            @default(0)
+  targetCountries     String[]       @default([])
+  startDate           DateTime
+  endDate             DateTime
+  status              CampaignStatus @default(DRAFT)
+  isDemo              Boolean        @default(false)
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  sessions    TaskSession[]
+  completions TaskCompletion[]
+
+  @@index([status, endDate])
+  @@index([advertiser])
+  @@map("campaigns")
+}
+
+model TaskSession {
+  id             String            @id @default(uuid()) @db.Uuid
+  userId         String            @db.Uuid
+  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaignId     String            @db.Uuid
+  campaign       Campaign          @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  status         TaskSessionStatus @default(STARTED)
+  nonce          String            @unique
+  requiredSeconds Int
+  watchedSeconds Int               @default(0)
+  heartbeatCount Int               @default(0)
+
+  // ---- Anti-cheat window/tab tracking -------------------------------
+  // Every figure below is accumulated server-side from heartbeat deltas.
+  // The client reports what it observed; the server decides what it means.
+  /** Seconds this page was visible AND focused, summed across heartbeats. */
+  activeSeconds  Int               @default(0)
+  /** Seconds the tab was backgrounded or the window was blurred. */
+  hiddenSeconds  Int               @default(0)
+  /** How many times focus left the window. */
+  focusLostCount Int               @default(0)
+  /** How many times the tab was backgrounded (visibilitychange). */
+  blurCount      Int               @default(0)
+  /** Longest single stretch with no heartbeat, in seconds. */
+  maxGapSeconds  Int               @default(0)
+  lastHeartbeatAt DateTime?
+  /** 100 = clean. Falls as integrity rules trip. */
+  integrityScore Int               @default(100)
+  /** Named rules that tripped, e.g. ["HIDDEN_MAJORITY","HEARTBEAT_GAP"]. */
+  integrityFlags String[]          @default([])
+
+  startedAt      DateTime          @default(now())
+  submittedAt    DateTime?
+  completedAt    DateTime?
+  expiresAt      DateTime
+  ipHash         String?
+  userAgentHash  String?
+  rejectionReason String?
+
+  completion TaskCompletion?
+
+  @@index([userId, status])
+  @@index([campaignId, status])
+  @@map("task_sessions")
+}
+
+model TaskCompletion {
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String   @db.Uuid
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaignId   String   @db.Uuid
+  campaign     Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  sessionId    String   @unique @db.Uuid
+  session      TaskSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  rewardAmount Int
+  watchedSeconds Int
+  createdAt    DateTime @default(now())
+
+  // A user may be rewarded once per campaign.
+  @@unique([userId, campaignId])
+  @@index([campaignId, createdAt])
+  @@map("task_completions")
+}
+
+// ----------------------------------------------------------------------
+// Surveys
+// ----------------------------------------------------------------------
+
+model SurveyProvider {
+  id          String   @id @default(uuid()) @db.Uuid
+  slug        String   @unique // cpx | pollfish | bitlabs
+  name        String
+  enabled     Boolean  @default(false)
+  configured  Boolean  @default(false)
+  revenueShareBps Int  @default(6000) // share of provider payout passed to the user
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  surveys     Survey[]
+  completions SurveyCompletion[]
+  webhookEvents WebhookEvent[]
+
+  @@map("survey_providers")
+}
+
+model Survey {
+  id              String   @id @default(uuid()) @db.Uuid
+  providerId      String   @db.Uuid
+  provider        SurveyProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  externalId      String
+  name            String
+  rewardAmount    Int
+  estimatedMinutes Int
+  loi             Int? // length of interview reported by provider
+  conversionRate  Float?
+  targetCountries String[] @default([])
+  clickUrl        String?
+  isDemo          Boolean  @default(false)
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  completions SurveyCompletion[]
+
+  @@unique([providerId, externalId])
+  @@index([active])
+  @@map("surveys")
+}
+
+model SurveyCompletion {
+  id            String                 @id @default(uuid()) @db.Uuid
+  userId        String                 @db.Uuid
+  user          User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  providerId    String                 @db.Uuid
+  provider      SurveyProvider         @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  surveyId      String?                @db.Uuid
+  survey        Survey?                @relation(fields: [surveyId], references: [id])
+  transactionId String // provider-side transaction id
+  /**
+   * Our own reference, handed to the provider on entry and echoed back in the
+   * postback. It is what links a STARTED row to the completion that settles it;
+   * without it every abandoned entry would leave an orphan row eating the
+   * member's daily survey allowance forever.
+   */
+  clickId       String?                @unique
+  status        SurveyCompletionStatus @default(STARTED)
+  rewardAmount  Int                    @default(0)
+  payoutAmount  Int                    @default(0) // what the provider pays the platform
+  startedAt     DateTime               @default(now())
+  completedAt   DateTime?
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+
+  // The provider transaction id is the idempotency anchor.
+  @@unique([providerId, transactionId])
+  @@index([userId, status])
+  @@map("survey_completions")
+}
+
+model WebhookEvent {
+  id          String   @id @default(uuid()) @db.Uuid
+  providerId  String?  @db.Uuid
+  provider    SurveyProvider? @relation(fields: [providerId], references: [id])
+  providerSlug String
+  eventId     String
+  signatureOk Boolean  @default(false)
+  payload     Json
+  processedAt DateTime?
+  error       String?
+  createdAt   DateTime @default(now())
+
+  // Replayed deliveries are recognised and ignored.
+  @@unique([providerSlug, eventId])
+  @@index([createdAt])
+  @@map("webhook_events")
+}
+
+// ----------------------------------------------------------------------
+// Wallet ledger
+// ----------------------------------------------------------------------
+
+model Wallet {
+  id               String   @id @default(uuid()) @db.Uuid
+  userId           String   @unique @db.Uuid
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  availableBalance Int      @default(0)
+  pendingBalance   Int      @default(0)
+  bonusBalance     Int      @default(0)
+  referralBalance  Int      @default(0)
+  lifetimeEarned   Int      @default(0)
+  lifetimeWithdrawn Int     @default(0)
+  currency         String   @default("PKR")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  transactions WalletTransaction[]
+
+  @@map("wallets")
+}
+
+model WalletTransaction {
+  id             String          @id @default(uuid()) @db.Uuid
+  walletId       String          @db.Uuid
+  wallet         Wallet          @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  userId         String          @db.Uuid
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type           TransactionType
+  bucket         BalanceBucket
+  // Signed minor units: positive credits the bucket, negative debits it.
+  amount         Int
+  balanceAfter   Int
+  description    String
+  // Idempotency anchor. Two writes with the same key can never both land.
+  idempotencyKey String          @unique
+  referenceType  String? // campaign | survey | withdrawal | referral | admin | tier
+  referenceId    String?
+  /**
+   * On-chain transaction hash when this movement settled over a blockchain.
+   * Promoted out of `metadata` so it can be indexed and reconciled against a
+   * block explorer without scanning JSON.
+   */
+  externalTxHash String?
+  externalNetwork CryptoNetwork?
+  metadata       Json?
+  createdAt      DateTime        @default(now())
+
+  @@index([userId, createdAt])
+  @@index([type, createdAt])
+  @@index([referenceType, referenceId])
+  @@index([externalTxHash])
+  @@map("wallet_transactions")
+}
+
+// ----------------------------------------------------------------------
+// Withdrawals
+// ----------------------------------------------------------------------
+
+model PayoutAccount {
+  id          String       @id @default(uuid()) @db.Uuid
+  userId      String       @db.Uuid
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  method      PayoutMethod
+  accountName String
+  /** Mobile number, IBAN, wallet address or Stripe account id, per method. */
+  accountNumber String
+  bankName    String?
+  /** Set only for CRYPTO_USDT. Sending USDT to the wrong chain destroys it. */
+  network     CryptoNetwork?
+  isDefault   Boolean      @default(false)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  withdrawals Withdrawal[]
+
+  @@unique([userId, method, accountNumber])
+  @@index([userId])
+  @@map("payout_accounts")
+}
+
+model Withdrawal {
+  id             String           @id @default(uuid()) @db.Uuid
+  userId         String           @db.Uuid
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payoutAccountId String?         @db.Uuid
+  payoutAccount  PayoutAccount?   @relation(fields: [payoutAccountId], references: [id])
+  method         PayoutMethod
+  accountName    String
+  accountNumber  String
+  bankName       String?
+
+  // ---- Crypto settlement evidence (CRYPTO_USDT only) ----------------
+  network        CryptoNetwork?
+  cryptoAsset    String?          // "USDT"
+  /** Decimal string of the on-chain amount. Never a float. */
+  cryptoAmount   String?
+  /** On-chain transaction hash, written once the transfer is broadcast. */
+  txHash         String?
+  confirmations  Int              @default(0)
+
+  // grossAmount = netAmount + fee. Debited from AVAILABLE at request time.
+  grossAmount    Int
+  fee            Int              @default(0)
+  netAmount      Int
+  status         WithdrawalStatus @default(PENDING)
+  reference      String           @unique
+  providerReference String?
+  reviewedById   String?          @db.Uuid
+  reviewedAt     DateTime?
+  processedAt    DateTime?
+  completedAt    DateTime?
+  rejectionReason String?
+  notes          String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@index([status, createdAt])
+  @@index([userId, createdAt])
+  @@index([txHash])
+  @@map("withdrawals")
+}
+
+// ----------------------------------------------------------------------
+// Membership tiers
+//
+// WHAT THIS IS: a subscription. A member pays a fixed fee for a fixed term
+// and gets a larger daily task and survey allowance for that term.
+//
+// WHAT THIS IS NOT, and must never become:
+//   * an investment — the fee buys capacity, not a return;
+//   * a node, stake or mining package — nothing accrues by holding a tier;
+//   * a scheme where a higher tier is guaranteed to earn back its price. The
+//     allowance is an upper bound on work available, not a promised income.
+//   * a source of downline commission — referral rewards are unchanged and
+//     stay single-level (see the Referral model).
+//
+// `maxDailyEarnings` on a plan is a CAP, and `priceAmount` should never be set
+// so low that the cap makes the tier self-funding — that is the line between a
+// subscription and a deposit-funded yield product, and crossing it is illegal
+// in most jurisdictions and a breach of every payment processor's terms.
+// ----------------------------------------------------------------------
+
+model TierPlan {
+  id           String   @id @default(uuid()) @db.Uuid
+  tier         UserTier @unique
+  name         String
+  description  String
+  /** Subscription fee in minor units. FREE is 0. */
+  priceAmount  Int      @default(0)
+  /** Term length. 0 means the tier never expires (FREE only). */
+  durationDays Int      @default(0)
+  /** Video tasks a member on this tier may complete per calendar day. */
+  dailyTaskLimit   Int  @default(5)
+  /** Surveys a member on this tier may start per calendar day. */
+  dailySurveyLimit Int  @default(3)
+  /** Discount on the flat withdrawal fee, in basis points. 10000 = free. */
+  withdrawalFeeDiscountBps Int @default(0)
+  /** Upper bound on what a member can earn per day on this tier. */
+  maxDailyEarnings Int  @default(0)
+  sortOrder    Int      @default(0)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  subscriptions TierSubscription[]
+
+  @@map("tier_plans")
+}
+
+model TierSubscription {
+  id         String             @id @default(uuid()) @db.Uuid
+  userId     String             @db.Uuid
+  user       User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planId     String             @db.Uuid
+  plan       TierPlan           @relation(fields: [planId], references: [id])
+  tier       UserTier
+  status     SubscriptionStatus @default(PENDING_PAYMENT)
+  /** What was actually charged, in minor units. History, not a live lookup. */
+  pricePaid  Int                @default(0)
+  /** "wallet" | "deposit" — where the fee came from. */
+  paidFrom   String
+  startedAt  DateTime?
+  expiresAt  DateTime?
+  cancelledAt DateTime?
+  reference  String             @unique
+  /** Set when the fee was paid by an external deposit rather than the wallet. */
+  depositId  String?            @unique @db.Uuid
+  deposit    Deposit?           @relation(fields: [depositId], references: [id])
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+
+  @@index([userId, status])
+  @@index([status, expiresAt])
+  @@map("tier_subscriptions")
+}
+
+// ----------------------------------------------------------------------
+// Deposits
+//
+// A deposit exists for exactly one reason: to pay a membership fee. It is
+// never credited to a withdrawable wallet bucket, and there is no path from
+// Deposit to a payout. Holding user funds on account and paying them back out
+// would make this a money transmission business, which needs a licence the
+// platform does not have.
+// ----------------------------------------------------------------------
+
+model Deposit {
+  id          String        @id @default(uuid()) @db.Uuid
+  userId      String        @db.Uuid
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  method      DepositMethod
+  /** Only TIER_UPGRADE is accepted. The column exists so the intent is explicit. */
+  purpose     String        @default("TIER_UPGRADE")
+  tier        UserTier?
+  /** Fee owed, in platform minor units. */
+  amount      Int
+  currency    String        @default("PKR")
+  status      DepositStatus @default(AWAITING_PAYMENT)
+  reference   String        @unique
+
+  // ---- Crypto rails -------------------------------------------------
+  network        CryptoNetwork?
+  cryptoAsset    String?      // "USDT"
+  /** Decimal string quoted at creation time. Never a float. */
+  cryptoAmount   String?
+  /** Address the gateway issued for this deposit. */
+  depositAddress String?
+  fromAddress    String?
+  txHash         String?
+  confirmations  Int          @default(0)
+  requiredConfirmations Int   @default(0)
+
+  // ---- Card rails ---------------------------------------------------
+  /** Stripe PaymentIntent / Checkout Session id, or the crypto gateway's id. */
+  providerReference String?
+  checkoutUrl       String?
+
+  paidAt        DateTime?
+  expiresAt     DateTime?
+  failureReason String?
+  metadata      Json?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  subscription TierSubscription?
+
+  // One on-chain transfer can settle exactly one deposit.
+  @@unique([method, txHash])
+  @@unique([method, providerReference])
+  @@index([userId, status])
+  @@index([status, expiresAt])
+  @@map("deposits")
+}
+
+model PaymentWebhookEvent {
+  id          String   @id @default(uuid()) @db.Uuid
+  provider    String   // "crypto" | "stripe"
+  eventId     String
+  eventType   String?
+  signatureOk Boolean  @default(false)
+  payload     Json
+  processedAt DateTime?
+  error       String?
+  createdAt   DateTime @default(now())
+
+  // Replayed deliveries are recognised and ignored.
+  @@unique([provider, eventId])
+  @@index([createdAt])
+  @@map("payment_webhook_events")
+}
+
+// ----------------------------------------------------------------------
+// Referrals — single level only. No MLM, no downline commissions.
+// ----------------------------------------------------------------------
+
+model Referral {
+  id          String         @id @default(uuid()) @db.Uuid
+  referrerId  String         @db.Uuid
+  referrer    User           @relation("Referrer", fields: [referrerId], references: [id], onDelete: Cascade)
+  refereeId   String         @unique @db.Uuid
+  referee     User           @relation("Referee", fields: [refereeId], references: [id], onDelete: Cascade)
+  code        String
+  status      ReferralStatus @default(PENDING)
+  rewardAmount Int           @default(0)
+  qualifiedAt DateTime?
+  rewardedAt  DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([referrerId, status])
+  @@map("referrals")
+}
+
+// ----------------------------------------------------------------------
+// Notifications & support
+// ----------------------------------------------------------------------
+
+model Notification {
+  id        String           @id @default(uuid()) @db.Uuid
+  userId    String           @db.Uuid
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  title     String
+  body      String
+  href      String?
+  readAt    DateTime?
+  emailQueuedAt DateTime?
+  emailSentAt   DateTime?
+  createdAt DateTime         @default(now())
+
+  @@index([userId, readAt])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+model SupportTicket {
+  id        String         @id @default(uuid()) @db.Uuid
+  userId    String         @db.Uuid
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reference String         @unique
+  subject   String
+  category  String         @default("GENERAL")
+  status    TicketStatus   @default(OPEN)
+  priority  TicketPriority @default(NORMAL)
+  closedAt  DateTime?
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  messages SupportMessage[]
+
+  @@index([status, updatedAt])
+  @@index([userId, createdAt])
+  @@map("support_tickets")
+}
+
+model SupportMessage {
+  id        String        @id @default(uuid()) @db.Uuid
+  ticketId  String        @db.Uuid
+  ticket    SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorId  String?       @db.Uuid
+  author    User?         @relation(fields: [authorId], references: [id])
+  isStaff   Boolean       @default(false)
+  body      String
+  createdAt DateTime      @default(now())
+
+  @@index([ticketId, createdAt])
+  @@map("support_messages")
+}
+
+// ----------------------------------------------------------------------
+// Risk & audit
+// ----------------------------------------------------------------------
+
+model FraudEvent {
+  id          String         @id @default(uuid()) @db.Uuid
+  userId      String?        @db.Uuid
+  user        User?          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        FraudEventType
+  level       RiskLevel
+  score       Int            @default(0)
+  summary     String
+  details     Json?
+  resolvedAt  DateTime?
+  resolvedById String?       @db.Uuid
+  createdAt   DateTime       @default(now())
+
+  @@index([userId, createdAt])
+  @@index([level, resolvedAt])
+  @@map("fraud_events")
+}
+
+model RiskScore {
+  id          String    @id @default(uuid()) @db.Uuid
+  userId      String    @unique @db.Uuid
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  score       Int       @default(0)
+  level       RiskLevel @default(LOW)
+  lastEventAt DateTime?
+  updatedAt   DateTime  @updatedAt
+  createdAt   DateTime  @default(now())
+
+  @@index([level])
+  @@map("risk_scores")
+}
+
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  actorId    String?  @db.Uuid
+  actor      User?    @relation("ActorLogs", fields: [actorId], references: [id])
+  actorEmail String?
+  action     String
+  entityType String
+  entityId   String?
+  before     Json?
+  after      Json?
+  ipHash     String?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model SystemSetting {
+  key         String      @id
+  value       String
+  type        SettingType @default(STRING)
+  label       String
+  description String?
+  group       String      @default("general")
+  updatedAt   DateTime    @updatedAt
+
+  @@map("system_settings")
+}

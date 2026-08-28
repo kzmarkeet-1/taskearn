@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TaskEarn — theme preview</title>
+    <!--
+      A standalone look at the theme, so it can be judged without running the
+      app. Every colour and font below is copied from src/app/globals.css and
+      tailwind.config.ts — if this file and those disagree, those are right.
+    -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --background: 216 38% 5%;
+        --card: 215 36% 9%;
+        --popover: 214 32% 13%;
+        --muted: 214 32% 13%;
+        --accent: 214 32% 17%;
+        --foreground: 212 48% 94%;
+        --muted-foreground: 210 17% 59%;
+        --primary: 228 100% 72%;
+        --primary-foreground: 216 38% 7%;
+        --success: 157 57% 48%;
+        --destructive: 350 85% 67%;
+        --warning: 35 84% 64%;
+        --tier-silver: 210 23% 72%;
+        --tier-gold: 40 64% 59%;
+        --tier-diamond: 189 70% 70%;
+        --border: 212 28% 18%;
+        --radius: 0.75rem;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        background: hsl(var(--background));
+        color: hsl(var(--foreground));
+        font-family: "Inter", system-ui, sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      h1, h2, h3 { font-family: "Bricolage Grotesque", "Inter", sans-serif; letter-spacing: -0.02em; margin: 0; }
+
+      /* The signature: money is never plain text. */
+      .money {
+        font-family: "IBM Plex Mono", ui-monospace, monospace;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: -0.01em;
+      }
+
+      /* One engraved field, spent on the one figure that matters. */
+      .ledger-field {
+        background-image: repeating-linear-gradient(
+          to bottom,
+          hsl(var(--foreground) / 0.05) 0px,
+          hsl(var(--foreground) / 0.05) 1px,
+          transparent 1px,
+          transparent 9px
+        );
+      }
+
+      .aurora { background: radial-gradient(60% 60% at 50% 0%, hsl(var(--primary) / 0.16) 0%, transparent 70%); }
+
+      .shell { display: grid; grid-template-columns: 260px 1fr; min-height: 100vh; }
+      @media (max-width: 860px) { .shell { grid-template-columns: 1fr; } .sidebar { display: none; } }
+
+      .sidebar {
+        background: hsl(var(--card));
+        border-right: 1px solid hsl(var(--border) / 0.7);
+        padding: 0;
+      }
+      .brand {
+        display: flex; align-items: center; gap: 10px;
+        height: 64px; padding: 0 20px;
+        border-bottom: 1px solid hsl(var(--border) / 0.7);
+        font-family: "Bricolage Grotesque", sans-serif; font-weight: 600;
+      }
+      .brand-mark {
+        width: 32px; height: 32px; border-radius: 9px;
+        background: hsl(var(--primary)); color: hsl(var(--primary-foreground));
+        display: grid; place-items: center; font-weight: 700; font-size: 15px;
+      }
+      .nav { padding: 12px; display: flex; flex-direction: column; gap: 2px; }
+      .nav a {
+        position: relative; display: block; padding: 9px 12px; border-radius: 9px;
+        color: hsl(var(--muted-foreground)); text-decoration: none;
+        font-size: 14px; font-weight: 500;
+      }
+      .nav a:hover { background: hsl(var(--accent)); color: hsl(var(--foreground)); }
+      .nav a.active {
+        background: hsl(var(--primary) / 0.1); color: hsl(var(--primary));
+      }
+      /* Active state is a left rule, not a filled pill — it reads at a glance
+         on a dark surface where a tint alone muddies into the background. */
+      .nav a.active::before {
+        content: ""; position: absolute; left: -12px; top: 6px; bottom: 6px;
+        width: 2px; border-radius: 2px; background: hsl(var(--primary));
+      }
+
+      .main { padding: 0; }
+      .hero {
+        position: relative; overflow: hidden;
+        border-bottom: 1px solid hsl(var(--border) / 0.7);
+        padding: 56px 40px 48px;
+      }
+      .hero .aurora { position: absolute; inset: 0 0 auto 0; height: 380px; }
+      .hero-inner { position: relative; max-width: 720px; }
+      .pill {
+        display: inline-flex; align-items: center; gap: 8px;
+        border: 1px solid hsl(var(--border) / 0.7); background: hsl(var(--card));
+        border-radius: 999px; padding: 5px 12px; font-size: 12px; font-weight: 500;
+        color: hsl(var(--muted-foreground));
+      }
+      .dot { width: 6px; height: 6px; border-radius: 50%; background: hsl(var(--success)); }
+      .hero h1 { margin-top: 22px; font-size: 60px; line-height: 1.03; font-weight: 600; }
+      .hero h1 .accent { color: hsl(var(--primary)); }
+      .hero p { margin-top: 20px; max-width: 520px; font-size: 17px; line-height: 1.6; color: hsl(var(--muted-foreground)); }
+
+      .btn {
+        display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 22px;
+        border-radius: 11px; border: 0; font: inherit; font-size: 15px; font-weight: 500;
+        cursor: pointer; text-decoration: none; transition: all .15s ease;
+      }
+      .btn-primary { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
+      .btn-primary:hover { box-shadow: 0 0 0 1px hsl(var(--primary) / .35), 0 8px 30px -10px hsl(var(--primary) / .45); }
+      .btn-outline { background: hsl(var(--card)); color: hsl(var(--foreground)); border: 1px solid hsl(var(--border)); }
+      .btn-outline:hover { border-color: hsl(var(--primary) / 0.5); background: hsl(var(--accent)); }
+      .actions { display: flex; gap: 12px; margin-top: 30px; flex-wrap: wrap; }
+
+      /* The stats strip: a ledger, not three floating numbers. */
+      .strip { margin-top: 52px; max-width: 460px; border-top: 1px solid hsl(var(--border) / .7); border-bottom: 1px solid hsl(var(--border) / .7); }
+      .strip .row { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding: 13px 0; border-bottom: 1px solid hsl(var(--border) / .7); }
+      .strip .row:last-child { border-bottom: 0; }
+      .strip .row span:first-child { font-size: 14px; color: hsl(var(--muted-foreground)); }
+      .strip .row span:last-child { font-size: 20px; font-weight: 500; }
+
+      .section { padding: 36px 40px; }
+      .section > h2 { font-size: 20px; font-weight: 600; margin-bottom: 4px; }
+      .section > .sub { color: hsl(var(--muted-foreground)); font-size: 14px; margin: 0 0 22px; }
+
+      .card {
+        background: hsl(var(--card));
+        border: 1px solid hsl(var(--border) / 0.7);
+        border-radius: var(--radius);
+        box-shadow: inset 0 1px 0 0 hsl(0 0% 100% / 0.04), 0 1px 2px 0 rgb(0 0 0 / 0.4);
+      }
+
+      .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+      @media (max-width: 1080px) { .grid4 { grid-template-columns: repeat(2, 1fr); } }
+      @media (max-width: 560px) { .grid4 { grid-template-columns: 1fr; } .hero { padding: 40px 20px; } .hero h1 { font-size: 40px; } .section { padding: 28px 20px; } }
+
+      .stat { padding: 20px; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+      .stat .label { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: hsl(var(--muted-foreground)); font-weight: 500; }
+      .stat .value { margin-top: 9px; font-size: 24px; font-weight: 600; }
+      .stat .hint { margin-top: 4px; font-size: 12px; color: hsl(var(--muted-foreground)); }
+      .chip { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; font-size: 15px; }
+      .chip.iris { background: hsl(var(--primary) / .1); color: hsl(var(--primary)); }
+      .chip.amber { background: hsl(var(--warning) / .15); color: hsl(var(--warning)); }
+      .chip.jade { background: hsl(var(--success) / .1); color: hsl(var(--success)); }
+      .chip.grey { background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); }
+
+      .balance { position: relative; overflow: hidden; margin-top: 18px; padding: 22px; }
+      .balance .field { position: absolute; inset: 0; opacity: .6; pointer-events: none; }
+      .balance .inner { position: relative; display: flex; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+      .balance .big { font-size: 40px; font-weight: 600; margin-top: 4px; letter-spacing: -0.02em; }
+
+      table { width: 100%; border-collapse: collapse; font-size: 14px; }
+      th {
+        text-align: left; padding: 12px 16px; font-size: 11px; font-weight: 600;
+        text-transform: uppercase; letter-spacing: .06em; color: hsl(var(--muted-foreground));
+        border-bottom: 1px solid hsl(var(--border) / .6);
+      }
+      td { padding: 13px 16px; border-bottom: 1px solid hsl(var(--border) / .6); }
+      tr:last-child td { border-bottom: 0; }
+      tbody tr:hover { background: hsl(var(--accent) / .5); }
+      .num { text-align: right; }
+      .credit { color: hsl(var(--success)); }
+      .debit { color: hsl(var(--destructive)); }
+
+      .badge {
+        display: inline-flex; align-items: center; border-radius: 999px;
+        padding: 3px 10px; font-size: 12px; font-weight: 500; border: 1px solid transparent;
+      }
+      .badge.iris { background: hsl(var(--primary) / .15); color: hsl(var(--primary)); }
+      .badge.jade { background: hsl(var(--success) / .15); color: hsl(var(--success)); }
+      .badge.amber { background: hsl(var(--warning) / .15); color: hsl(var(--warning)); }
+      .badge.rose { background: hsl(var(--destructive) / .15); color: hsl(var(--destructive)); }
+      .badge.silver { background: hsl(var(--tier-silver) / .12); color: hsl(var(--tier-silver)); }
+      .badge.gold { background: hsl(var(--tier-gold) / .12); color: hsl(var(--tier-gold)); }
+      .badge.diamond { background: hsl(var(--tier-diamond) / .12); color: hsl(var(--tier-diamond)); }
+
+      .alerts { display: grid; gap: 12px; max-width: 720px; }
+      .alert { border: 1px solid hsl(var(--border)); border-left-width: 2px; border-radius: 10px; padding: 14px 16px; font-size: 14px; }
+      .alert strong { display: block; margin-bottom: 3px; font-family: "Bricolage Grotesque", sans-serif; font-weight: 600; }
+      .alert p { margin: 0; color: hsl(var(--muted-foreground)); }
+      .alert.info { border-left-color: hsl(var(--primary)); background: hsl(var(--primary) / .06); }
+      .alert.warn { border-left-color: hsl(var(--warning)); background: hsl(var(--warning) / .06); }
+      .alert.err { border-left-color: hsl(var(--destructive)); background: hsl(var(--destructive) / .06); }
+      .alert.ok { border-left-color: hsl(var(--success)); background: hsl(var(--success) / .06); }
+
+      .tiers { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+      @media (max-width: 860px) { .tiers { grid-template-columns: 1fr; } }
+      .tier { padding: 20px; }
+      .tier.current { border-color: hsl(var(--primary) / .6); box-shadow: 0 0 0 1px hsl(var(--primary) / .35), 0 8px 30px -10px hsl(var(--primary) / .45); }
+      .tier h3 { font-size: 17px; font-weight: 600; }
+      .tier .price { margin-top: 4px; font-size: 14px; color: hsl(var(--muted-foreground)); }
+      .tier ul { margin: 16px 0 0; padding: 0; list-style: none; display: grid; gap: 7px; font-size: 14px; }
+      .tier li::before { content: "✓ "; color: hsl(var(--success)); }
+
+      .swatches { display: flex; flex-wrap: wrap; gap: 10px; }
+      .sw { border-radius: 10px; padding: 12px 14px; min-width: 130px; border: 1px solid hsl(var(--border)); }
+      .sw .hex { font-family: "IBM Plex Mono", monospace; font-size: 11px; color: hsl(var(--muted-foreground)); margin-top: 4px; }
+      .sw .name { font-size: 13px; font-weight: 500; }
+      .sw .bar { height: 24px; border-radius: 6px; margin-bottom: 10px; }
+
+      footer { padding: 28px 40px 60px; color: hsl(var(--muted-foreground)); font-size: 13px; border-top: 1px solid hsl(var(--border) / .7); }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="brand"><span class="brand-mark">T</span> TaskEarn</div>
+        <nav class="nav">
+          <a href="#">Overview</a>
+          <a href="#" class="active">Wallet</a>
+          <a href="#">Video tasks</a>
+          <a href="#">Surveys</a>
+          <a href="#">Withdraw</a>
+          <a href="#">Membership</a>
+          <a href="#">Referrals</a>
+          <a href="#">Support</a>
+        </nav>
+      </aside>
+
+      <main class="main">
+        <section class="hero">
+          <div class="aurora"></div>
+          <div class="hero-inner">
+            <span class="pill"><span class="dot"></span> Free to join · no deposits · no investment products</span>
+            <h1>Every rupee,<br /><span class="accent">on the record.</span></h1>
+            <p>
+              Watch sponsored videos and answer surveys that match you. Every reward, fee and reversal is a line in
+              your history with a running balance — and no line is ever edited after the fact.
+            </p>
+            <div class="actions">
+              <a class="btn btn-primary" href="#">Start earning →</a>
+              <a class="btn btn-outline" href="#">Advertise with us</a>
+            </div>
+            <div class="strip">
+              <div class="row"><span>Campaigns open now</span><span class="money">12</span></div>
+              <div class="row"><span>Survey partners live</span><span class="money">3</span></div>
+              <div class="row"><span>Minimum withdrawal</span><span class="money">PKR 500.00</span></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="section">
+          <h2>Wallet</h2>
+          <p class="sub">Every movement, with the balance it left behind.</p>
+
+          <div class="grid4">
+            <div class="card stat">
+              <div><div class="label">Available</div><div class="value money">PKR 4,250.00</div><div class="hint">Withdrawable now</div></div>
+              <span class="chip iris">◆</span>
+            </div>
+            <div class="card stat">
+              <div><div class="label">Pending</div><div class="value money">PKR 1,500.00</div><div class="hint">Clears after 24h</div></div>
+              <span class="chip amber">◷</span>
+            </div>
+            <div class="card stat">
+              <div><div class="label">Bonus</div><div class="value money">PKR 0.00</div><div class="hint">Promotional credit</div></div>
+              <span class="chip grey">◇</span>
+            </div>
+            <div class="card stat">
+              <div><div class="label">Referral</div><div class="value money">PKR 300.00</div><div class="hint">From people you invited</div></div>
+              <span class="chip jade">◈</span>
+            </div>
+          </div>
+
+          <div class="card balance">
+            <div class="ledger-field field"></div>
+            <div class="inner">
+              <div>
+                <div style="font-size:14px;color:hsl(var(--muted-foreground))">Total you can withdraw</div>
+                <div class="big money">PKR 4,550.00</div>
+                <div style="margin-top:6px;font-size:12px;color:hsl(var(--muted-foreground));max-width:420px">
+                  Available, bonus and referral balances combined. Pending rewards are not included until they clear.
+                </div>
+              </div>
+              <div style="font-size:14px;color:hsl(var(--muted-foreground));text-align:right">
+                <div>Lifetime earned <span class="money" style="color:hsl(var(--foreground));font-weight:500">PKR 18,900.00</span></div>
+                <div style="margin-top:5px">Lifetime withdrawn <span class="money" style="color:hsl(var(--foreground));font-weight:500">PKR 14,350.00</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card" style="margin-top:18px;overflow:hidden">
+            <table>
+              <thead>
+                <tr><th>Date</th><th>Description</th><th>Type</th><th class="num">Amount</th><th class="num">Balance</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="money">26 Aug</td><td>Survey reward — CPX Research</td>
+                  <td><span class="badge jade">credited</span></td>
+                  <td class="num money credit">+340.00</td><td class="num money">4,550.00</td>
+                </tr>
+                <tr>
+                  <td class="money">26 Aug</td><td>Task reward — Solar panel explainer</td>
+                  <td><span class="badge jade">credited</span></td>
+                  <td class="num money credit">+200.00</td><td class="num money">4,210.00</td>
+                </tr>
+                <tr>
+                  <td class="money">25 Aug</td><td>Withdrawal WD-M4K2P1-9F3A</td>
+                  <td><span class="badge iris">processing</span></td>
+                  <td class="num money debit">−2,000.00</td><td class="num money">4,010.00</td>
+                </tr>
+                <tr>
+                  <td class="money">25 Aug</td><td>Withdrawal fee WD-M4K2P1-9F3A</td>
+                  <td><span class="badge amber">fee</span></td>
+                  <td class="num money debit">−25.00</td><td class="num money">6,010.00</td>
+                </tr>
+                <tr>
+                  <td class="money">24 Aug</td><td>Survey reward reversed by BitLabs</td>
+                  <td><span class="badge rose">reversed</span></td>
+                  <td class="num money debit">−180.00</td><td class="num money">6,035.00</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="section" style="padding-top:0">
+          <h2>Membership</h2>
+          <p class="sub">A subscription to a larger daily allowance — not an investment.</p>
+          <div class="tiers">
+            <div class="card tier current">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start">
+                <div><h3>Silver</h3><div class="price"><span class="money" style="color:hsl(var(--foreground))">PKR 500.00</span> · 30 days</div></div>
+                <span class="badge silver">silver</span>
+              </div>
+              <ul><li>10 video tasks a day</li><li>6 surveys a day</li><li>50% off the withdrawal fee</li></ul>
+            </div>
+            <div class="card tier">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start">
+                <div><h3>Gold</h3><div class="price"><span class="money" style="color:hsl(var(--foreground))">PKR 1,200.00</span> · 30 days</div></div>
+                <span class="badge gold">gold</span>
+              </div>
+              <ul><li>20 video tasks a day</li><li>12 surveys a day</li><li>No withdrawal fee</li></ul>
+            </div>
+            <div class="card tier">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start">
+                <div><h3>Diamond</h3><div class="price"><span class="money" style="color:hsl(var(--foreground))">PKR 3,000.00</span> · 30 days</div></div>
+                <span class="badge diamond">diamond</span>
+              </div>
+              <ul><li>35 video tasks a day</li><li>20 surveys a day</li><li>Priority support</li></ul>
+            </div>
+          </div>
+        </section>
+
+        <section class="section" style="padding-top:0">
+          <h2>Messages</h2>
+          <p class="sub">Direction, not mood. An error says what happened and what to do.</p>
+          <div class="alerts">
+            <div class="alert info"><strong>What a membership is</strong><p>A subscription, not an investment. It raises your daily allowance for the length of the term and pays no return.</p></div>
+            <div class="alert ok"><strong>Task complete</strong><p>PKR 200.00 has been added to your pending balance. It clears once the verification hold passes.</p></div>
+            <div class="alert warn"><strong>You have used today's allowance</strong><p>Free covers 5 tasks a day. Your allowance resets at midnight.</p></div>
+            <div class="alert err"><strong>That session could not be verified</strong><p>The task tab needs to stay visible for at least 48s. We counted 12s.</p></div>
+          </div>
+        </section>
+
+        <section class="section" style="padding-top:0">
+          <h2>Palette</h2>
+          <p class="sub">Ink, rule and paper — with colour reserved for money and the actions that move it.</p>
+          <div class="swatches">
+            <div class="sw"><div class="bar" style="background:#080C12;border:1px solid hsl(var(--border))"></div><div class="name">ink</div><div class="hex">#080C12</div></div>
+            <div class="sw"><div class="bar" style="background:#0F1620"></div><div class="name">slate</div><div class="hex">#0F1620</div></div>
+            <div class="sw"><div class="bar" style="background:#212D3B"></div><div class="name">rule</div><div class="hex">#212D3B</div></div>
+            <div class="sw"><div class="bar" style="background:#E8EFF7"></div><div class="name">paper</div><div class="hex">#E8EFF7</div></div>
+            <div class="sw"><div class="bar" style="background:#6E8BFF"></div><div class="name">iris · action</div><div class="hex">#6E8BFF</div></div>
+            <div class="sw"><div class="bar" style="background:#35C08A"></div><div class="name">jade · credit</div><div class="hex">#35C08A</div></div>
+            <div class="sw"><div class="bar" style="background:#F2637A"></div><div class="name">rose · debit</div><div class="hex">#F2637A</div></div>
+            <div class="sw"><div class="bar" style="background:#F0B056"></div><div class="name">amber · warning</div><div class="hex">#F0B056</div></div>
+          </div>
+        </section>
+
+        <footer>
+          Preview only. The real values live in <span class="money">src/app/globals.css</span> and
+          <span class="money">tailwind.config.ts</span>.
+        </footer>
+      </main>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,193 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Theme: "Ledger at night".
+ *
+ * The idea the palette is built on: this product is a ledger. The codebase is
+ * already obsessive about it — append-only rows, nothing simulated, every
+ * figure read from the database. So the interface is a quiet dark workspace
+ * where the only things that carry colour are money and the actions that move
+ * it. Everything else is ink, rule and paper.
+ *
+ * Two colour decisions worth stating, because both were arguments:
+ *
+ *  1. The primary is iris, not gold. A rewards platform that is deliberately
+ *     not an investment scheme should not be dressed as one, and gold-on-black
+ *     is the house style of exactly the products this one is built to not be.
+ *  2. Metals appear only on tier badges — the one place the product itself
+ *     says "silver", "gold", "diamond". A decorative metal anywhere else would
+ *     be borrowing the same costume for no reason.
+ *
+ * Dark is the default theme rather than a toggle. `.light` is kept intact for
+ * anyone who wants the original, and nothing in the app hardcodes a colour, so
+ * both work everywhere.
+ */
+
+@layer base {
+  :root {
+    /* --- surfaces, darkest to lightest ------------------------------- */
+    --background: 216 38% 5%; /* ink    #080C12 */
+    --card: 215 36% 9%; /* slate  #0F1620 */
+    --popover: 214 32% 13%; /* raised #161F2B */
+    --muted: 214 32% 13%;
+    --secondary: 214 32% 13%;
+    --accent: 214 32% 17%; /* hover surface */
+
+    /* --- text --------------------------------------------------------- */
+    --foreground: 212 48% 94%; /* paper     #E8EFF7 */
+    --card-foreground: 212 48% 94%;
+    --popover-foreground: 212 48% 94%;
+    --muted-foreground: 210 17% 59%; /* graphite  #8496A8 */
+    --secondary-foreground: 212 48% 94%;
+    --accent-foreground: 212 48% 94%;
+
+    /* --- action ------------------------------------------------------- */
+    --primary: 228 100% 72%; /* iris   #6E8BFF */
+    --primary-foreground: 216 38% 7%;
+
+    /* --- money direction ---------------------------------------------- */
+    --success: 157 57% 48%; /* jade   #35C08A — credits */
+    --success-foreground: 216 38% 7%;
+    --destructive: 350 85% 67%; /* rose   #F2637A — debits, errors */
+    --destructive-foreground: 216 38% 7%;
+    --warning: 35 84% 64%; /* amber  #F0B056 */
+    --warning-foreground: 216 38% 7%;
+
+    /* --- tier metals, used only on tier badges ------------------------ */
+    --tier-silver: 210 23% 72%;
+    --tier-gold: 40 64% 59%;
+    --tier-diamond: 189 70% 70%;
+
+    /* --- structure ---------------------------------------------------- */
+    --border: 212 28% 18%; /* rule   #212D3B */
+    --input: 212 28% 20%;
+    --ring: 228 100% 72%;
+
+    --radius: 0.75rem;
+  }
+
+  /* The original light theme, kept whole. Add `class="light"` to <html>. */
+  .light {
+    --background: 210 40% 98%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 221 83% 53%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 210 40% 96%;
+    --accent-foreground: 222 47% 11%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 210 40% 98%;
+    --success: 142 71% 36%;
+    --success-foreground: 210 40% 98%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 222 47% 11%;
+    --tier-silver: 215 16% 47%;
+    --tier-gold: 35 80% 38%;
+    --tier-diamond: 189 70% 38%;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 221 83% 53%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "cv11", "ss01";
+  }
+  :focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+  /* Headings carry the display face; body text stays in the UI face. */
+  h1,
+  h2,
+  h3 {
+    @apply font-display tracking-tight;
+  }
+  /* Native controls inherit the dark surface instead of a white system default. */
+  select option {
+    background-color: hsl(var(--popover));
+    color: hsl(var(--popover-foreground));
+  }
+  ::selection {
+    background-color: hsl(var(--primary) / 0.28);
+  }
+}
+
+@layer utilities {
+  /*
+   * The signature: money is never plain text.
+   *
+   * Every amount, reference and transaction hash is set in the mono face with
+   * tabular figures, so columns of money line up on the decimal the way they
+   * do on a statement. It is also the only honest way to render a 64-character
+   * hash — in a proportional face nobody can compare two of them.
+   */
+  .money {
+    font-family: var(--font-mono), ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+
+  /*
+   * A single engraved hairline field, the banknote reference reduced to one
+   * repeating rule. Used behind the wallet balance and nowhere else — it is the
+   * one decorative move in the theme and it only earns its place once.
+   */
+  .ledger-field {
+    background-image: repeating-linear-gradient(
+      to bottom,
+      hsl(var(--foreground) / 0.05) 0px,
+      hsl(var(--foreground) / 0.05) 1px,
+      transparent 1px,
+      transparent 9px
+    );
+  }
+
+  .grid-backdrop {
+    background-image: linear-gradient(to right, hsl(var(--foreground) / 0.045) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--foreground) / 0.045) 1px, transparent 1px);
+    background-size: 44px 44px;
+  }
+
+  /* Soft light behind the hero. Positioned by the caller. */
+  .aurora {
+    background: radial-gradient(60% 60% at 50% 0%, hsl(var(--primary) / 0.16) 0%, transparent 70%);
+  }
+
+  .tier-silver {
+    color: hsl(var(--tier-silver));
+    background-color: hsl(var(--tier-silver) / 0.12);
+  }
+  .tier-gold {
+    color: hsl(var(--tier-gold));
+    background-color: hsl(var(--tier-gold) / 0.12);
+  }
+  .tier-diamond {
+    color: hsl(var(--tier-diamond));
+    background-color: hsl(var(--tier-diamond) / 0.12);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

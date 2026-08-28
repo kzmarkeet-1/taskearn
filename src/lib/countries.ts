@@ -1,0 +1,21 @@
+/** Kept short and editable — extend as the platform opens up new markets. */
+export const COUNTRIES = [
+  "Pakistan",
+  "Bangladesh",
+  "India",
+  "Indonesia",
+  "Egypt",
+  "Nigeria",
+  "Philippines",
+  "Kenya",
+  "Malaysia",
+  "Sri Lanka",
+  "Turkey",
+  "United Arab Emirates",
+  "Saudi Arabia",
+  "United Kingdom",
+  "United States",
+  "Canada",
+  "Australia",
+  "Other",
+];
